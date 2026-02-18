@@ -4,6 +4,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .serializers import ReportSerializer
 from .models import Report
 from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
 
 class SubmitReportView(generics.ListCreateAPIView):
     queryset = Report.objects.all()
@@ -23,5 +24,6 @@ class SubmitReportView(generics.ListCreateAPIView):
         # 3. Save the report with this user
         serializer.save(user=user)
 
+@login_required(login_url='/login/')
 def dashboard_view(request):
     return render(request, 'reports/dashboard.html')
