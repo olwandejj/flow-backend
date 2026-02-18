@@ -1,10 +1,11 @@
+from django.shortcuts import render
 from rest_framework import generics, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 from .serializers import ReportSerializer
 from .models import Report
 from django.contrib.auth.models import User
 
-class SubmitReportView(generics.CreateAPIView):
+class SubmitReportView(generics.ListCreateAPIView):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
     permission_classes = [permissions.AllowAny] 
@@ -21,3 +22,6 @@ class SubmitReportView(generics.CreateAPIView):
             
         # 3. Save the report with this user
         serializer.save(user=user)
+
+def dashboard_view(request):
+    return render(request, 'reports/dashboard.html')

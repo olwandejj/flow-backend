@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FlowReporter Live</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .info-panel {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background: white; padding: 15px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="info-panel">
+        <h3 style="margin: 0 0 5px 0;">💧 FlowReporter Live</h3>
+        <div id="status">Loading data...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([-1.2921, 36.8219], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        fetch('/api/reports/submit/')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('status').innerText = data.length + " Reports Found";
+                
+                data.forEach(report => {
+                    if (report.latitude && report.longitude) {
+                        var marker = L.marker([report.latitude, report.longitude]).addTo(map);
+                        
+                        var popupContent = `
+                            <div style="width:200px">
+                                <b>${report.category}</b><br>
+                                Severity: <b>${report.severity}</b><br>
+                                Status: ${report.status}<br>
+                                <hr style="margin: 5px 0;">
+                        `;
+
+                        if (report.image_file) {
+                            popupContent += `<img src="${report.image_file}" width="100%" style="border-radius:4px;">`;
+                        } else {
+                            popupContent += `<i>No Image</i>`;
+                        }
+                        
+                        popupContent += `</div>`;
+                        marker.bindPopup(popupContent);
+                    }
+                });
+
+                // Auto-zoom to latest report
+                if (data.length > 0 && data[0].latitude) {
+                    map.flyTo([data[0].latitude, data[0].longitude], 15);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('status').innerText = "Error Loading Data";
+            });
+    </script>
+</body>
+</html>

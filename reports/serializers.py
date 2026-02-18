@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Report, Location, Image
 
 class ReportSerializer(serializers.ModelSerializer):
-    # We explicitly define these fields to accept data from the App
+    # --- WRITE ONLY (Inputs from Android) ---
     latitude = serializers.FloatField(write_only=True)
     longitude = serializers.FloatField(write_only=True)
     accuracy = serializers.FloatField(write_only=True)
@@ -14,17 +14,18 @@ class ReportSerializer(serializers.ModelSerializer):
                   'latitude', 'longitude', 'accuracy', 'image_file']
         read_only_fields = ['status', 'timestamp']
 
+    # --- 1. CREATE (Android Upload) ---
     def create(self, validated_data):
-        # 1. Extract the nested data
+        # Pop the extra fields
         lat = validated_data.pop('latitude')
         long = validated_data.pop('longitude')
         acc = validated_data.pop('accuracy')
         img = validated_data.pop('image_file')
 
-        # 2. Create the Report (The "Parent")
+        # Create Report
         report = Report.objects.create(**validated_data)
 
-        # 3. Create the Location (The "Child")
+        # Create Location
         Location.objects.create(
             report=report, 
             latitude=lat, 
@@ -32,10 +33,31 @@ class ReportSerializer(serializers.ModelSerializer):
             accuracy=acc
         )
 
-        # 4. Create the Image (The "Child")
+        # Create Image
         Image.objects.create(
             report=report, 
             file_path=img
         )
 
         return report
+
+    # --- 2. REPRESENTATION (Dashboard Display) ---
+    def to_representation(self, instance):
+        # Start with standard data
+        data = super().to_representation(instance)
+        
+        # Add GPS Data manually
+        if hasattr(instance, 'location'):
+            data['latitude'] = instance.location.latitude
+            data['longitude'] = instance.location.longitude
+        
+        # Add Image URL manually
+        if hasattr(instance, 'image') and instance.image.file_path:
+            # This creates a full URL (http://...) for the browser
+            request = self.context.get('request')
+            if request:
+                data['image_file'] = request.build_absolute_uri(instance.image.file_path.url)
+            else:
+                data['image_file'] = instance.image.file_path.url
+                
+        return data
