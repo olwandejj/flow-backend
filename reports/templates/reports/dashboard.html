@@ -120,7 +120,10 @@
         // Helper: Choose color based on Severity
         function getIcon(severity) {
             if (!severity) return icons.green;
-            var s = severity.toLowerCase();
+            
+            // SANITIZER: Removes quotes, newlines, and extra spaces, then lowercases
+            var s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
+            
             if (s === 'critical' || s === 'high') return icons.red;
             if (s === 'medium') return icons.orange;
             return icons.green; // Low or New
@@ -128,7 +131,11 @@
 
         // Helper: Get border color for list cards
         function getBorderColor(severity) {
-            var s = severity ? severity.toLowerCase() : '';
+            if (!severity) return '#2ecc71';
+            
+            // SANITIZER: Removes quotes, newlines, and extra spaces, then lowercases
+            var s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
+            
             if (s === 'critical' || s === 'high') return '#e74c3c'; // Red
             if (s === 'medium') return '#f39c12'; // Orange
             return '#2ecc71'; // Green
@@ -178,6 +185,8 @@
                         // Click Event: Fly to marker
                         item.addEventListener('click', () => {
                             map.flyTo([report.latitude, report.longitude], 16);
+                            // --- NEW: Pull this specific marker to the front of the stack ---
+                            marker.setZIndexOffset(1000);
                             marker.openPopup();
                         });
 
