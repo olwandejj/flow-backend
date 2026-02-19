@@ -13,16 +13,8 @@ class SubmitReportView(generics.ListCreateAPIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def perform_create(self, serializer):
-        # 1. Try to get the existing admin user
-        user = User.objects.first()
-        
-        # 2. SAFETY NET: If no user exists, create one on the fly
-        if not user:
-            print("WARNING: No user found. Creating 'admin' automatically.")
-            user = User.objects.create_superuser('admin', 'admin@flow.com', 'password123')
-            
-        # 3. Save the report with this user
-        serializer.save(user=user)
+        # This automatically gets the user from the Token!
+        serializer.save(user=self.request.user)
 
 @login_required(login_url='/login/')
 def dashboard_view(request):
