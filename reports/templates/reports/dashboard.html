@@ -84,7 +84,7 @@
             </form>
         </div>
         <div id="report-list">
-            </div>
+        </div>
     </div>
 
     <div id="map"></div>
@@ -98,7 +98,7 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 2. Define Custom Icons
+        // 2. Define Custom Icons (Added Grey for Resolved)
         var icons = {
             red: new L.Icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
@@ -114,14 +114,19 @@
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
                 shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+            }),
+            grey: new L.Icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
             })
         };
 
-        // Helper: Choose color based on Severity
-        function getIcon(severity) {
+        // Helper: Choose color based on Severity & Status
+        function getIcon(severity, status) {
+            if (status === 'Resolved') return icons.grey; // Grey out resolved issues
             if (!severity) return icons.green;
             
-            // SANITIZER: Removes quotes, newlines, and extra spaces, then lowercases
             var s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
             
             if (s === 'critical' || s === 'high') return icons.red;
@@ -130,10 +135,10 @@
         }
 
         // Helper: Get border color for list cards
-        function getBorderColor(severity) {
+        function getBorderColor(severity, status) {
+            if (status === 'Resolved') return '#95a5a6'; // Grey border
             if (!severity) return '#2ecc71';
             
-            // SANITIZER: Removes quotes, newlines, and extra spaces, then lowercases
             var s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
             
             if (s === 'critical' || s === 'high') return '#e74c3c'; // Red
@@ -146,46 +151,63 @@
             .then(res => res.json())
             .then(data => {
                 // Update Stats
-                document.getElementById('stats-text').innerText = `${data.length} Active Reports`;
+                document.getElementById('stats-text').innerText = `${data.length} Total Reports`;
                 
-                // Get list container
                 var listContainer = document.getElementById('report-list');
                 
                 // Reverse data to show newest first
                 data.reverse().forEach(report => {
-                    // --- A. MAP MARKER ---
                     if (report.latitude && report.longitude) {
+                        
+                        // --- A. MAP MARKER ---
                         var marker = L.marker([report.latitude, report.longitude], {
-                            icon: getIcon(report.severity)
+                            icon: getIcon(report.severity, report.status)
                         }).addTo(map);
 
-                        // Popup Content
+                        // --- NEW: Popup Content with Update Form ---
                         var popupHTML = `
-                            <b>${report.category}</b><br>
-                            Severity: <b style="color:${getBorderColor(report.severity)}">${report.severity}</b><br>
-                            Status: ${report.status}
+                            <div style="min-width: 160px;">
+                                <h3 style="margin:0 0 5px 0; color:#2c3e50;">${report.category}</h3>
+                                Severity: <b style="color:${getBorderColor(report.severity, report.status)}">${report.severity}</b><br>
+                                Status: <b>${report.status || 'New'}</b><br>
                         `;
+                        
                         if (report.image_file) {
-                            popupHTML += `<br><img src="${report.image_file}" class="popup-img">`;
+                            popupHTML += `<img src="${report.image_file}" class="popup-img"><br>`;
                         }
+
+                        // Add the Status Dropdown and Save Button
+                        popupHTML += `
+                                <hr style="margin: 10px 0;">
+                                <label style="font-size: 0.85em; font-weight: bold; color: #555;">Update Status:</label>
+                                <select id="status-${report.id}" style="width:100%; padding:5px; margin-top:4px; margin-bottom:8px; border-radius:4px;">
+                                    <option value="New" ${report.status === 'New' ? 'selected' : ''}>New</option>
+                                    <option value="In Progress" ${report.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                    <option value="Resolved" ${report.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
+                                </select>
+                                <button onclick="updateReportStatus(${report.id})" style="width:100%; background:#2980b9; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                                    Save Changes
+                                </button>
+                            </div>
+                        `;
+                        
                         marker.bindPopup(popupHTML);
 
                         // --- B. SIDEBAR LIST ITEM ---
                         var item = document.createElement('div');
                         item.className = 'report-item';
-                        item.style.borderLeftColor = getBorderColor(report.severity);
+                        item.style.borderLeftColor = getBorderColor(report.severity, report.status);
                         item.innerHTML = `
                             <div class="report-cat">${report.category}</div>
                             <div class="report-meta">
-                                <span class="badge" style="background:${getBorderColor(report.severity)}">${report.severity}</span>
-                                &nbsp; Status: ${report.status}
+                                <span class="badge" style="background:${getBorderColor(report.severity, report.status)}">${report.severity}</span>
+                                &nbsp; Status: <b>${report.status || 'New'}</b>
                             </div>
                         `;
                         
                         // Click Event: Fly to marker
                         item.addEventListener('click', () => {
                             map.flyTo([report.latitude, report.longitude], 16);
-                            // --- NEW: Pull this specific marker to the front of the stack ---
                             marker.setZIndexOffset(1000);
                             marker.openPopup();
                         });
@@ -195,6 +217,30 @@
                 });
             })
             .catch(err => console.error("Error:", err));
+
+        // 4. NEW: Function to send the status update to Django
+        function updateReportStatus(reportId) {
+            const newStatus = document.getElementById(`status-${reportId}`).value;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            fetch(`/api/reports/${reportId}/update-status/`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Status updated successfully!');
+                    location.reload(); // Refresh the page to show the new colors
+                } else {
+                    alert('Failed to update status. Please try again.');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
     </script>
 </body>
 </html>
