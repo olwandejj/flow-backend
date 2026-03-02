@@ -4,10 +4,39 @@
     <meta charset="UTF-8">
     <title>FlowReporter Command Center</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #ecf0f1; }
         
-        /* Sidebar Styles */
+        /* 1. New Left Navigation Bar */
+        #main-nav {
+            width: 80px;
+            background: #1a252f;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            z-index: 2000;
+        }
+        .nav-item {
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 12px;
+        }
+        .nav-item:hover { background: #2c3e50; }
+        .nav-icon { font-size: 24px; display: block; margin-bottom: 5px; }
+
+        /* Logout Form Styling */
+        .logout-form { width: 100%; margin-top: auto; margin-bottom: 20px; }
+        .logout-btn { background: transparent; border: none; color: #e74c3c; cursor: pointer; width: 100%; text-align: center; font-size: 12px; font-weight: bold; }
+        .logout-btn .nav-icon { color: #e74c3c; }
+
+        /* 2. Existing Sidebar (Report List) */
         #sidebar {
             width: 350px;
             background: #f8f9fa;
@@ -17,166 +46,276 @@
             box-shadow: 2px 0 5px rgba(0,0,0,0.1);
             z-index: 1001;
         }
-        .sidebar-header {
-            padding: 20px;
-            background: #2c3e50;
-            color: white;
-            text-align: center;
-        }
+        .sidebar-header { padding: 20px; background: #2980b9; color: white; text-align: center; }
         .sidebar-header h2 { margin: 0; font-size: 1.5rem; }
-        .stats { font-size: 0.9rem; opacity: 0.8; margin-top: 5px; }
+        .stats { font-size: 0.9rem; opacity: 0.9; margin-top: 5px; font-weight: bold;}
         
-        #report-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
+        #report-list { flex: 1; overflow-y: auto; padding: 10px; }
         
-        /* Report Item Card */
         .report-item {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-left: 5px solid #ccc; /* Default border color */
+            background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #ccc;
         }
-        .report-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            background: #f1f3f5;
-        }
+        .report-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: #f1f3f5; }
         .report-cat { font-weight: bold; font-size: 1.1rem; color: #333; }
         .report-meta { font-size: 0.85rem; color: #666; margin-top: 5px; }
-        .badge {
-            display: inline-block; padding: 3px 8px; border-radius: 12px; 
-            font-size: 0.75rem; font-weight: bold; color: white;
-        }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; color: white; }
 
-        /* Map Styles */
-        #map { flex: 1; height: 100%; }
+        /* 3. Main Content Area */
+        #content-area { flex: 1; position: relative; }
         
-        /* Popup Image */
+        #map-view { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        
+        #analytics-view {
+            width: 100%; height: 100%; position: absolute; top: 0; left: 0;
+            background: #ecf0f1; padding: 30px; box-sizing: border-box;
+            display: none; overflow-y: auto; z-index: 10;
+        }
+        
+        /* Analytics Chart Containers */
+        .chart-container {
+            background: white; border-radius: 8px; padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 900px; margin: 0 auto 30px auto;
+        }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .chart-header h2 { margin: 0; color: #2c3e50; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; outline: none; cursor: pointer; }
+        
         .popup-img { width: 100%; height: auto; border-radius: 4px; margin-top: 8px; border: 1px solid #eee; }
     </style>
 </head>
 <body>
 
+    <div id="main-nav">
+        <div class="nav-item" onclick="switchView('map')">
+            <span class="nav-icon">🗺️</span>
+            Map
+        </div>
+        <div class="nav-item" onclick="switchView('analytics')">
+            <span class="nav-icon">📊</span>
+            Analytics
+        </div>
+        
+        <form action="{% url 'logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="logout-btn">
+                <span class="nav-icon">🚪</span>
+                Logout
+            </button>
+        </form>
+    </div>
+
     <div id="sidebar">
         <div class="sidebar-header">
             <h2>💧 FlowReporter</h2>
             <div class="stats" id="stats-text">Loading reports...</div>
-            <form action="{% url 'logout' %}" method="post" style="margin-top: 10px;">
-                {% csrf_token %}
-                <button type="submit" style="
-                    width: 100%;
-                    padding: 8px; 
-                    background: #e74c3c; 
-                    color: white; 
-                    border: none; 
-                    border-radius: 4px; 
-                    cursor: pointer;
-                    font-size: 0.9rem;">
-                    Log Out
-                </button>
-            </form>
         </div>
-        <div id="report-list">
-        </div>
+        <div id="report-list"></div>
     </div>
 
-    <div id="map"></div>
+    <div id="content-area">
+        
+        <div id="map-view"></div>
+        
+        <div id="analytics-view">
+            
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h2>Report Resolution Performance</h2>
+                    <select id="timeFilter" onchange="updateTimeChart()">
+                        <option value="day">Filter by Day</option>
+                        <option value="month" selected>Filter by Month</option>
+                        <option value="year">Filter by Year</option>
+                    </select>
+                </div>
+                <canvas id="performanceChart" height="120"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h2>Damage Breakdown by Category</h2>
+                </div>
+                <div style="max-width: 400px; margin: 0 auto;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+        
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        // 1. Initialize Map
-        var map = L.map('map').setView([-1.2921, 36.8219], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        // Global Variables
+        let map;
+        let globalReports = [];
+        let performanceChart = null;
+        let categoryChart = null; // NEW
 
-        // 2. Define Custom Icons (Added Grey for Resolved)
-        var icons = {
-            red: new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-            }),
-            orange: new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-            }),
-            green: new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-            }),
-            grey: new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-            })
+        // --- A. INITIALIZE MAP ---
+        function initMap() {
+            map = L.map('map-view').setView([-1.2921, 36.8219], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        const icons = {
+            red: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            orange: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            green: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            grey: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] })
         };
 
-        // Helper: Choose color based on Severity & Status
         function getIcon(severity, status) {
-            if (status === 'Resolved') return icons.grey; // Grey out resolved issues
+            if (status === 'Resolved') return icons.grey;
             if (!severity) return icons.green;
-            
-            var s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
-            
+            let s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
             if (s === 'critical' || s === 'high') return icons.red;
             if (s === 'medium') return icons.orange;
-            return icons.green; // Low or New
+            return icons.green;
         }
 
-        // Helper: Get border color for list cards
         function getBorderColor(severity, status) {
-            if (status === 'Resolved') return '#95a5a6'; // Grey border
+            if (status === 'Resolved') return '#95a5a6';
             if (!severity) return '#2ecc71';
-            
-            var s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
-            
-            if (s === 'critical' || s === 'high') return '#e74c3c'; // Red
-            if (s === 'medium') return '#f39c12'; // Orange
-            return '#2ecc71'; // Green
+            let s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
+            if (s === 'critical' || s === 'high') return '#e74c3c';
+            if (s === 'medium') return '#f39c12';
+            return '#2ecc71';
         }
 
-        // 3. Fetch Data
+        // --- B. VIEW TOGGLE LOGIC ---
+        function switchView(viewName) {
+            const mapView = document.getElementById('map-view');
+            const analyticsView = document.getElementById('analytics-view');
+            
+            if (viewName === 'map') {
+                mapView.style.display = 'block';
+                analyticsView.style.display = 'none';
+                map.invalidateSize(); 
+            } else {
+                mapView.style.display = 'none';
+                analyticsView.style.display = 'block';
+                updateTimeChart();     // Draw Time Chart
+                updateCategoryChart(); // Draw Category Chart
+            }
+        }
+
+        // --- C. CHART AGGREGATION LOGIC ---
+        function updateTimeChart() {
+            const filterType = document.getElementById('timeFilter').value;
+            const groupedData = {};
+
+            globalReports.forEach(report => {
+                if (!report.timestamp) return;
+                const date = new Date(report.timestamp);
+                let key = '';
+
+                if (filterType === 'day') {
+                    key = date.toLocaleDateString(); 
+                } else if (filterType === 'month') {
+                    key = date.toLocaleString('default', { month: 'short', year: 'numeric' }); 
+                } else if (filterType === 'year') {
+                    key = date.getFullYear().toString(); 
+                }
+
+                if (!groupedData[key]) {
+                    groupedData[key] = { submitted: 0, resolved: 0 };
+                }
+
+                groupedData[key].submitted += 1;
+                if (report.status === 'Resolved') {
+                    groupedData[key].resolved += 1;
+                }
+            });
+
+            const labels = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b)); 
+            const submittedData = labels.map(label => groupedData[label].submitted);
+            const resolvedData = labels.map(label => groupedData[label].resolved);
+
+            if (performanceChart) performanceChart.destroy();
+
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Reports Submitted', backgroundColor: '#3498db', data: submittedData },
+                        { label: 'Reports Resolved', backgroundColor: '#2ecc71', data: resolvedData }
+                    ]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        }
+
+        // --- NEW: CATEGORY CHART LOGIC ---
+        function updateCategoryChart() {
+            const categoryCounts = {};
+
+            // Count occurrences of each category
+            globalReports.forEach(report => {
+                const cat = report.category || 'Unknown';
+                if (!categoryCounts[cat]) {
+                    categoryCounts[cat] = 0;
+                }
+                categoryCounts[cat] += 1;
+            });
+
+            const labels = Object.keys(categoryCounts);
+            const data = Object.values(categoryCounts);
+
+            if (categoryChart) categoryChart.destroy();
+
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut', // Doughnut charts are great for categorical breakdown
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        // Add some professional, distinct colors for different damage types
+                        backgroundColor: ['#e74c3c', '#f39c12', '#3498db', '#9b59b6', '#2ecc71', '#34495e'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right' } // Put legend on the side so it's readable
+                    }
+                }
+            });
+        }
+
+        // --- D. FETCH DATA & BUILD MAP ---
+        initMap();
+
         fetch('/api/reports/submit/')
             .then(res => res.json())
             .then(data => {
-                // Update Stats
+                globalReports = data; 
                 document.getElementById('stats-text').innerText = `${data.length} Total Reports`;
-                
                 var listContainer = document.getElementById('report-list');
                 
-                // Reverse data to show newest first
                 data.reverse().forEach(report => {
                     if (report.latitude && report.longitude) {
                         
-                        // --- A. MAP MARKER ---
                         var marker = L.marker([report.latitude, report.longitude], {
                             icon: getIcon(report.severity, report.status)
                         }).addTo(map);
 
-                        // --- NEW: Popup Content with Update Form ---
                         var popupHTML = `
                             <div style="min-width: 160px;">
                                 <h3 style="margin:0 0 5px 0; color:#2c3e50;">${report.category}</h3>
                                 Severity: <b style="color:${getBorderColor(report.severity, report.status)}">${report.severity}</b><br>
                                 Status: <b>${report.status || 'New'}</b><br>
                         `;
+                        if (report.image_file) popupHTML += `<img src="${report.image_file}" class="popup-img"><br>`;
                         
-                        if (report.image_file) {
-                            popupHTML += `<img src="${report.image_file}" class="popup-img"><br>`;
-                        }
-
-                        // Add the Status Dropdown and Save Button
                         popupHTML += `
                                 <hr style="margin: 10px 0;">
                                 <label style="font-size: 0.85em; font-weight: bold; color: #555;">Update Status:</label>
@@ -190,10 +329,8 @@
                                 </button>
                             </div>
                         `;
-                        
                         marker.bindPopup(popupHTML);
 
-                        // --- B. SIDEBAR LIST ITEM ---
                         var item = document.createElement('div');
                         item.className = 'report-item';
                         item.style.borderLeftColor = getBorderColor(report.severity, report.status);
@@ -204,9 +341,8 @@
                                 &nbsp; Status: <b>${report.status || 'New'}</b>
                             </div>
                         `;
-                        
-                        // Click Event: Fly to marker
                         item.addEventListener('click', () => {
+                            switchView('map'); 
                             map.flyTo([report.latitude, report.longitude], 16);
                             marker.setZIndexOffset(1000);
                             marker.openPopup();
@@ -218,23 +354,19 @@
             })
             .catch(err => console.error("Error:", err));
 
-        // 4. NEW: Function to send the status update to Django
         function updateReportStatus(reportId) {
             const newStatus = document.getElementById(`status-${reportId}`).value;
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
             fetch(`/api/reports/${reportId}/update-status/`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify({ status: newStatus })
             })
             .then(response => {
                 if (response.ok) {
                     alert('Status updated successfully!');
-                    location.reload(); // Refresh the page to show the new colors
+                    location.reload(); 
                 } else {
                     alert('Failed to update status. Please try again.');
                 }
