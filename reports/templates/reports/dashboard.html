@@ -27,7 +27,7 @@
         
         #report-list { flex: 1; overflow-y: auto; padding: 10px; }
         
-        .report-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #ccc; }
+        .report-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border-left: 6px solid #ccc; }
         .report-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: #f1f3f5; }
         .report-cat { font-weight: bold; font-size: 1.1rem; color: #333; }
         .report-meta { font-size: 0.85rem; color: #666; margin-top: 5px; line-height: 1.4; }
@@ -95,34 +95,64 @@
         let performanceChart = null;
         let categoryChart = null;
 
-        function initMap() {
-            map = L.map('map-view').setView([-1.2921, 36.8219], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+        // --- DYNAMIC CATEGORY COLOR MAPPING ---
+        const colorPalette = [
+            { hex: '#e74c3c', iconName: 'red' },     
+            { hex: '#f39c12', iconName: 'orange' },  
+            { hex: '#3498db', iconName: 'blue' },    
+            { hex: '#9b59b6', iconName: 'violet' },  
+            { hex: '#2ecc71', iconName: 'green' },   
+            { hex: '#34495e', iconName: 'black' }    
+        ];
+        
+        let categoryColors = {};
+        let paletteIndex = 0;
+
+        function getCategoryColorObj(category) {
+            let catStr = String(category || 'Unknown').trim().toLowerCase();
+            if (!categoryColors[catStr]) {
+                categoryColors[catStr] = colorPalette[paletteIndex % colorPalette.length];
+                paletteIndex++;
+            }
+            return categoryColors[catStr];
         }
 
+        // --- EXTENDED LEAFLET ICONS ---
         const icons = {
             red: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
             orange: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            blue: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            violet: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
             green: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
+            black: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
             grey: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] })
         };
 
-        function getIcon(severity, status) {
+        function getIcon(category, status) {
             if (status === 'Resolved') return icons.grey;
-            if (!severity) return icons.green;
-            let s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
-            if (s === 'critical' || s === 'high') return icons.red;
-            if (s === 'medium') return icons.orange;
-            return icons.green;
+            let colorObj = getCategoryColorObj(category);
+            return icons[colorObj.iconName];
         }
 
-        function getBorderColor(severity, status) {
-            if (status === 'Resolved') return '#95a5a6';
-            if (!severity) return '#2ecc71';
-            let s = String(severity).replace(/['"\n\r]+/g, '').trim().toLowerCase();
-            if (s === 'critical' || s === 'high') return '#e74c3c';
-            if (s === 'medium') return '#f39c12';
-            return '#2ecc71';
+        function getBorderColor(category, status) {
+            if (status === 'Resolved') return '#95a5a6'; 
+            let colorObj = getCategoryColorObj(category);
+            return colorObj.hex;
+        }
+
+        // --- UPDATED: Severity Badge Color Function ---
+        function getSeverityBadgeColor(severity, status) {
+            if (status === 'Resolved') return '#95a5a6'; // Turns badge grey when resolved
+            
+            let s = String(severity).trim().toLowerCase();
+            if (s === 'critical' || s === 'high') return '#e74c3c'; // Red
+            if (s === 'medium') return '#f39c12'; // Orange
+            return '#2ecc71'; // Green
+        }
+
+        function initMap() {
+            map = L.map('map-view').setView([-1.2921, 36.8219], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
         }
 
         function switchView(viewName) {
@@ -163,6 +193,8 @@
 
         function updateCategoryChart() {
             const categoryCounts = {};
+            const chartBgColors = []; 
+
             globalReports.forEach(report => {
                 const cat = report.category || 'Unknown';
                 if (!categoryCounts[cat]) categoryCounts[cat] = 0;
@@ -172,11 +204,16 @@
             const labels = Object.keys(categoryCounts);
             const data = Object.values(categoryCounts);
 
+            labels.forEach(label => {
+                let colorObj = getCategoryColorObj(label);
+                chartBgColors.push(colorObj.hex);
+            });
+
             if (categoryChart) categoryChart.destroy();
             const ctx = document.getElementById('categoryChart').getContext('2d');
             categoryChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#e74c3c', '#f39c12', '#3498db', '#9b59b6', '#2ecc71', '#34495e'], borderWidth: 1 }] },
+                data: { labels: labels, datasets: [{ data: data, backgroundColor: chartBgColors, borderWidth: 1 }] },
                 options: { responsive: true, plugins: { legend: { position: 'right' } } }
             });
         }
@@ -193,22 +230,20 @@
                 data.reverse().forEach(report => {
                     if (report.latitude && report.longitude) {
                         
-                        // --- 1. FORMAT DATE ---
                         let dateStr = "Unknown Date";
                         if (report.timestamp) {
                             let dateObj = new Date(report.timestamp);
-                            dateStr = dateObj.toLocaleString(); // Formats to something like "3/2/2026, 12:30 PM"
+                            dateStr = dateObj.toLocaleString(); 
                         }
 
-                        // --- 2. UPDATE POPUP HTML (ADDED COORDINATES) ---
                         var marker = L.marker([report.latitude, report.longitude], {
-                            icon: getIcon(report.severity, report.status)
+                            icon: getIcon(report.category, report.status)
                         }).addTo(map);
 
                         var popupHTML = `
                             <div style="min-width: 160px;">
-                                <h3 style="margin:0 0 5px 0; color:#2c3e50;">${report.category}</h3>
-                                Severity: <b style="color:${getBorderColor(report.severity, report.status)}">${report.severity}</b><br>
+                                <h3 style="margin:0 0 5px 0; color:${getBorderColor(report.category, report.status)};">${report.category}</h3>
+                                Severity: <b>${report.severity}</b><br>
                                 Status: <b>${report.status || 'New'}</b><br>
                                 <span class="coord-text">📍 ${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</span>
                         `;
@@ -229,14 +264,15 @@
                         `;
                         marker.bindPopup(popupHTML);
 
-                        // --- 3. UPDATE SIDEBAR ITEM (ADDED TIMESTAMP) ---
                         var item = document.createElement('div');
                         item.className = 'report-item';
-                        item.style.borderLeftColor = getBorderColor(report.severity, report.status);
+                        item.style.borderLeftColor = getBorderColor(report.category, report.status);
+                        
+                        // --- UPDATED: Passed report.status into getSeverityBadgeColor ---
                         item.innerHTML = `
                             <div class="report-cat">${report.category}</div>
                             <div class="report-meta">
-                                <span class="badge" style="background:${getBorderColor(report.severity, report.status)}">${report.severity}</span>
+                                <span class="badge" style="background:${getSeverityBadgeColor(report.severity, report.status)}">${report.severity}</span>
                                 &nbsp; Status: <b>${report.status || 'New'}</b><br>
                                 <div style="margin-top: 5px; color: #7f8c8d; font-size: 0.8em;">
                                     🕒 ${dateStr}
