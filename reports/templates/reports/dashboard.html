@@ -27,11 +27,23 @@
         
         #report-list { flex: 1; overflow-y: auto; padding: 10px; }
         
-        .report-item { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border-left: 6px solid #ccc; }
-        .report-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: #f1f3f5; }
-        .report-cat { font-weight: bold; font-size: 1.1rem; color: #333; }
-        .report-meta { font-size: 0.85rem; color: #666; margin-top: 5px; line-height: 1.4; }
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; color: white; margin-bottom: 5px; }
+        /* Report Item Card Styling */
+        .report-item { 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            cursor: pointer; 
+            transition: transform 0.2s, box-shadow 0.2s, filter 0.2s; 
+            color: white; 
+        }
+        .report-item:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+            filter: brightness(0.95); 
+        }
+        .report-cat { font-weight: bold; font-size: 1.1rem; }
+        .report-meta { font-size: 0.85rem; margin-top: 5px; line-height: 1.4; color: #f8f9fa; }
 
         /* 3. Main Content Area */
         #content-area { flex: 1; position: relative; }
@@ -43,8 +55,16 @@
         .chart-header h2 { margin: 0; color: #2c3e50; }
         select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; outline: none; cursor: pointer; }
         
-        .popup-img { width: 100%; height: auto; border-radius: 4px; margin-top: 8px; border: 1px solid #eee; }
-        .coord-text { font-size: 0.85em; color: #7f8c8d; font-family: monospace; display: block; margin-top: 2px; }
+        /* 4. Custom Leaflet Popup Overrides */
+        .leaflet-popup-content-wrapper { padding: 0 !important; overflow: hidden; border-radius: 8px; border: none; }
+        .leaflet-popup-content { margin: 0 !important; line-height: 1.4; }
+        .popup-inner { padding: 15px; color: white; min-width: 200px; box-sizing: border-box; }
+        .popup-inner h3 { margin: 0 0 5px 0; color: white; }
+        .popup-inner hr { border: 0; height: 1px; background: rgba(255,255,255,0.3); margin: 10px 0; }
+        .popup-inner label { color: white !important; }
+        
+        .popup-img { width: 100%; height: auto; border-radius: 4px; margin-top: 8px; border: 1px solid rgba(255,255,255,0.3); }
+        .coord-text { font-size: 0.85em; opacity: 0.9; font-family: monospace; display: block; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -95,7 +115,6 @@
         let performanceChart = null;
         let categoryChart = null;
 
-        // --- DYNAMIC CATEGORY COLOR MAPPING ---
         const colorPalette = [
             { hex: '#e74c3c', iconName: 'red' },     
             { hex: '#f39c12', iconName: 'orange' },  
@@ -117,7 +136,6 @@
             return categoryColors[catStr];
         }
 
-        // --- EXTENDED LEAFLET ICONS ---
         const icons = {
             red: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
             orange: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }),
@@ -134,20 +152,10 @@
             return icons[colorObj.iconName];
         }
 
-        function getBorderColor(category, status) {
-            if (status === 'Resolved') return '#95a5a6'; 
+        function getUiColor(category, status) {
+            if (status === 'Resolved') return '#95a5a6'; // Grey out if resolved
             let colorObj = getCategoryColorObj(category);
             return colorObj.hex;
-        }
-
-        // --- UPDATED: Severity Badge Color Function ---
-        function getSeverityBadgeColor(severity, status) {
-            if (status === 'Resolved') return '#95a5a6'; // Turns badge grey when resolved
-            
-            let s = String(severity).trim().toLowerCase();
-            if (s === 'critical' || s === 'high') return '#e74c3c'; // Red
-            if (s === 'medium') return '#f39c12'; // Orange
-            return '#2ecc71'; // Green
         }
 
         function initMap() {
@@ -186,7 +194,7 @@
             const ctx = document.getElementById('performanceChart').getContext('2d');
             performanceChart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: labels, datasets: [ { label: 'Reports Submitted', backgroundColor: '#3498db', data: submittedData }, { label: 'Reports Resolved', backgroundColor: '#2ecc71', data: resolvedData } ] },
+                data: { labels: labels, datasets: [ { label: 'Reports Submitted', backgroundColor: '#2ecc71', data: submittedData }, { label: 'Reports Resolved', backgroundColor: '#95a5a6', data: resolvedData } ] },
                 options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
             });
         }
@@ -236,28 +244,31 @@
                             dateStr = dateObj.toLocaleString(); 
                         }
 
+                        let itemColor = getUiColor(report.category, report.status);
+
                         var marker = L.marker([report.latitude, report.longitude], {
                             icon: getIcon(report.category, report.status)
                         }).addTo(map);
 
+                        // --- UPDATED: Added <b> tags around the coordinates ---
                         var popupHTML = `
-                            <div style="min-width: 160px;">
-                                <h3 style="margin:0 0 5px 0; color:${getBorderColor(report.category, report.status)};">${report.category}</h3>
+                            <div class="popup-inner" style="background-color: ${itemColor};">
+                                <h3>${report.category}</h3>
                                 Severity: <b>${report.severity}</b><br>
                                 Status: <b>${report.status || 'New'}</b><br>
-                                <span class="coord-text">📍 ${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</span>
+                                <span class="coord-text">Coordinates: <b>${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</b></span>
                         `;
                         if (report.image_file) popupHTML += `<img src="${report.image_file}" class="popup-img"><br>`;
                         
                         popupHTML += `
-                                <hr style="margin: 10px 0;">
-                                <label style="font-size: 0.85em; font-weight: bold; color: #555;">Update Status:</label>
-                                <select id="status-${report.id}" style="width:100%; padding:5px; margin-top:4px; margin-bottom:8px; border-radius:4px;">
+                                <hr>
+                                <label style="font-size: 0.85em; font-weight: bold;">Update Status:</label>
+                                <select id="status-${report.id}" style="width:100%; padding:5px; margin-top:4px; margin-bottom:8px; border-radius:4px; border: none; color: #333;">
                                     <option value="New" ${report.status === 'New' ? 'selected' : ''}>New</option>
                                     <option value="In Progress" ${report.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
                                     <option value="Resolved" ${report.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
                                 </select>
-                                <button onclick="updateReportStatus(${report.id})" style="width:100%; background:#2980b9; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold;">
+                                <button onclick="updateReportStatus(${report.id})" style="width:100%; background:rgba(0,0,0,0.2); color:white; border:1px solid rgba(255,255,255,0.4); padding:8px; border-radius:4px; cursor:pointer; font-weight:bold;">
                                     Save Changes
                                 </button>
                             </div>
@@ -266,15 +277,13 @@
 
                         var item = document.createElement('div');
                         item.className = 'report-item';
-                        item.style.borderLeftColor = getBorderColor(report.category, report.status);
+                        item.style.backgroundColor = itemColor;
                         
-                        // --- UPDATED: Passed report.status into getSeverityBadgeColor ---
                         item.innerHTML = `
                             <div class="report-cat">${report.category}</div>
                             <div class="report-meta">
-                                <span class="badge" style="background:${getSeverityBadgeColor(report.severity, report.status)}">${report.severity}</span>
-                                &nbsp; Status: <b>${report.status || 'New'}</b><br>
-                                <div style="margin-top: 5px; color: #7f8c8d; font-size: 0.8em;">
+                                Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br>
+                                <div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em;">
                                     🕒 ${dateStr}
                                 </div>
                             </div>
