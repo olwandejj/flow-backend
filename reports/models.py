@@ -9,6 +9,9 @@ class Report(models.Model):
     severity = models.CharField(max_length=20) # e.g., High
     status = models.CharField(max_length=20, default='New')
     timestamp = models.DateTimeField(auto_now_add=True)
+    
+    # NEW: Store the device token to send Firebase push notifications
+    fcm_token = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         db_table = 'reports'
@@ -19,9 +22,6 @@ class Location(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     accuracy = models.FloatField()
-    
-    # We add this purely for the "Geospatial Dashboard" requirement
-    # but the schema mainly relies on the lat/long floats above.
     
     class Meta:
         db_table = 'locations'
@@ -34,3 +34,13 @@ class Image(models.Model):
 
     class Meta:
         db_table = 'images'
+
+# 5. NEW: Feedback Table (1-to-1 with Report)
+class Feedback(models.Model):
+    report = models.OneToOneField(Report, on_delete=models.CASCADE, related_name='feedback')
+    rating = models.IntegerField() # e.g., 1 to 5 stars
+    comments = models.TextField(blank=True, null=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'feedback'
