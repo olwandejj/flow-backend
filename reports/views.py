@@ -51,19 +51,17 @@ def update_report_status(request, pk):
             # --- ACTUAL FIREBASE PUSH NOTIFICATION TRIGGER ---
             if new_status == 'Resolved' and report.fcm_token:
                 try:
-                    # Create the notification payload
+                    # CHANGED: We removed 'notification=' and put everything inside 'data='
+                    # This ensures the Android app stays in 100% control of the click behavior
                     message = messaging.Message(
-                        notification=messaging.Notification(
-                            title='Water Leak Repaired! 💧',
-                            body=f'Your report for a {report.category} has been resolved. Tap here to rate the repair!'
-                        ),
                         data={
+                            'title': 'Water Leak Repaired! 💧',
+                            'body': f'Your report for a {report.category} has been resolved. Tap here to rate the repair!',
                             'report_id': str(report.id),
                             'action': 'rate_repair'
                         },
                         token=report.fcm_token,
                     )
-                    # Send it via Google's servers to the Android app
                     response = messaging.send(message)
                     print(f"Successfully sent Firebase message: {response}")
                 except Exception as e:
