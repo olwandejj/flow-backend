@@ -97,3 +97,11 @@ def submit_rating(request, pk):
         return Response({'message': 'Thank you! Your feedback has been received.'})
     except Report.DoesNotExist:
         return Response({'error': 'Report not found'}, status=404)
+
+class UserReportsView(generics.ListAPIView):
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Return only reports belonging to the logged-in user, newest first
+        return Report.objects.filter(user=self.request.user).order_by('-timestamp')
