@@ -296,18 +296,25 @@
                             let stars = '★'.repeat(report.rating) + '☆'.repeat(5 - report.rating);
                             let feedbackItem = document.createElement('div');
                             feedbackItem.className = 'feedback-card';
+                            
+                            // --- NEW: Format the feedback timestamp safely and cleanly ---
+                            let fbDateStr = report.feedback_timestamp 
+                                ? new Date(report.feedback_timestamp).toLocaleString('default', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) 
+                                : "Just now";
+
+                            // --- UPDATED: Swapped Report ID for the new fbDateStr ---
                             feedbackItem.innerHTML = `
-                                <strong>${report.category} Issue Repaired</strong> <span style="color:#95a5a6; font-size:0.8em;">(Report ID: #${report.id})</span>
+                                <strong>${report.category} Issue Repaired</strong> <span style="color:#95a5a6; font-size:0.8em;">(Posted: ${fbDateStr})</span>
                                 <div class="feedback-stars">${stars}</div>
                                 ${report.feedback ? `<div class="feedback-comment">"${report.feedback}"</div>` : ''}
                             `;
                             
-                            // --- NEW: Click Listener to jump to the map ---
+                            // Click Listener to jump to the map
                             feedbackItem.addEventListener('click', () => { 
                                 switchView('map'); 
-                                map.flyTo([report.latitude, report.longitude], 17); // Zoom in close!
-                                marker.setZIndexOffset(1000); // Bring marker to the front
-                                marker.openPopup(); // Pop open the details
+                                map.flyTo([report.latitude, report.longitude], 17);
+                                marker.setZIndexOffset(1000); 
+                                marker.openPopup(); 
                             });
                             
                             feedbackContainer.appendChild(feedbackItem);

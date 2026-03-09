@@ -42,5 +42,11 @@ class Feedback(models.Model):
     comments = models.TextField(blank=True, null=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
 
+    # null=True ensures your database doesn't crash if you already have older feedback saved
+    created_at = models.DateTimeField(auto_now_add=True, null=True) 
+
+    def __str__(self):
+        return f"Feedback for Report #{self.report.id}"
+
     class Meta:
         db_table = 'feedback'

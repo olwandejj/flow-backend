@@ -67,8 +67,12 @@ class ReportSerializer(serializers.ModelSerializer):
         if hasattr(instance, 'feedback'):
             data['rating'] = instance.feedback.rating
             data['feedback'] = instance.feedback.comments
+            
+            # ---> ADDED THE TIMESTAMP HERE <---
+            data['feedback_timestamp'] = instance.feedback.created_at 
         else:
             data['rating'] = None
             data['feedback'] = None
+            data['feedback_timestamp'] = None
                 
         return data
