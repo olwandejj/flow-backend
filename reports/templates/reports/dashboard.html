@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>FlowReporter Command Center</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
@@ -99,8 +101,9 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script>
-        let map, globalReports = [], performanceChart = null, categoryChart = null, resolvedCategoryChart = null;
+        let map, globalReports = [], performanceChart = null, categoryChart = null, resolvedCategoryChart = null, markersClusterGroup;
 
         const colorPalette = [{ hex: '#e74c3c', iconName: 'red' }, { hex: '#f39c12', iconName: 'orange' }, { hex: '#3498db', iconName: 'blue' }, { hex: '#9b59b6', iconName: 'violet' }, { hex: '#2ecc71', iconName: 'green' }, { hex: '#34495e', iconName: 'black' }];
         let categoryColors = {}, paletteIndex = 0;
@@ -134,6 +137,13 @@
         function initMap() {
             map = L.map('map-view').setView([-1.2921, 36.8219], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            
+            // --- NEW: Initialize the Cluster Group and add it to the map ---
+            markersClusterGroup = L.markerClusterGroup({
+                maxClusterRadius: 50, // Groups pins that are within 50 pixels of each other
+                spiderfyOnMaxZoom: true // Fans out overlapping pins at max zoom
+            });
+            map.addLayer(markersClusterGroup);
         }
 
         function switchView(viewName) {
@@ -264,7 +274,7 @@
                         let itemColor = getUiColor(report.category, report.status);
 
                         // 1. Map Marker & Popup
-                        var marker = L.marker([report.latitude, report.longitude], { icon: getIcon(report.category, report.status) }).addTo(map);
+                        var marker = L.marker([report.latitude, report.longitude], { icon: getIcon(report.category, report.status) });
                         var popupHTML = `
                             <div class="popup-inner" style="background-color: ${itemColor};">
                                 <h3>${report.category}</h3>
@@ -282,13 +292,21 @@
                                 <button onclick="updateReportStatus(${report.id})" style="width:100%; background:rgba(0,0,0,0.2); color:white; border:1px solid rgba(255,255,255,0.4); padding:8px; border-radius:4px; cursor:pointer; font-weight:bold;">Save Changes</button>
                             </div>`;
                         marker.bindPopup(popupHTML);
+                        // NEW: Add the marker to the cluster group instead of the raw map
+                        markersClusterGroup.addLayer(marker);
 
                         // 2. Sidebar Item
                         var item = document.createElement('div');
                         item.className = 'report-item';
                         item.style.backgroundColor = itemColor;
                         item.innerHTML = `<div class="report-cat">${report.category}</div><div class="report-meta">Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br><div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em;">🕒 ${dateStr}</div></div>`;
-                        item.addEventListener('click', () => { switchView('map'); map.flyTo([report.latitude, report.longitude], 16); marker.setZIndexOffset(1000); marker.openPopup(); });
+                        // UPDATED: Use MarkerCluster's special zoom function so it un-clusters before opening the popup
+                        item.addEventListener('click', () => { 
+                            switchView('map'); 
+                            markersClusterGroup.zoomToShowLayer(marker, function () {
+                                marker.openPopup();
+                            });
+                        });
                         listContainer.appendChild(item);
 
                         // 3. Feedback Cards
@@ -309,12 +327,12 @@
                                 ${report.feedback ? `<div class="feedback-comment">"${report.feedback}"</div>` : ''}
                             `;
                             
-                            // Click Listener to jump to the map
+                            // UPDATED: Click Listener to jump to the map and unpack the cluster
                             feedbackItem.addEventListener('click', () => { 
                                 switchView('map'); 
-                                map.flyTo([report.latitude, report.longitude], 17);
-                                marker.setZIndexOffset(1000); 
-                                marker.openPopup(); 
+                                markersClusterGroup.zoomToShowLayer(marker, function () {
+                                    marker.openPopup();
+                                });
                             });
                             
                             feedbackContainer.appendChild(feedbackItem);
