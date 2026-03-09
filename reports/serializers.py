@@ -13,8 +13,9 @@ class ReportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Report
+        # --- UPDATED: Added 'phone_number' to the list ---
         fields = ['id', 'category', 'severity', 'status', 'timestamp', 
-                  'latitude', 'longitude', 'accuracy', 'image_file', 'fcm_token']
+                  'latitude', 'longitude', 'accuracy', 'image_file', 'fcm_token', 'phone_number']
         read_only_fields = ['status', 'timestamp']
 
     # --- 1. CREATE (Android Upload) ---

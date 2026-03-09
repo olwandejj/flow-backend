@@ -8,6 +8,7 @@ class Report(models.Model):
     category = models.CharField(max_length=50) # e.g., Burst Pipe
     severity = models.CharField(max_length=20) # e.g., High
     status = models.CharField(max_length=20, default='New')
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     
     # NEW: Store the device token to send Firebase push notifications

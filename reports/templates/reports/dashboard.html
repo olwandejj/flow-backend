@@ -251,35 +251,34 @@
                 
                 var listContainer = document.getElementById('report-list');
                 var feedbackContainer = document.getElementById('feedback-list-container');
+                feedbackContainer.innerHTML = ''; // Clear container before rendering
                 
-                // --- NEW MULTI-LEVEL SORTING LOGIC ---
+                // --- NEW: Dictionary to save markers for the Feedback click listener ---
+                const mapMarkers = {};
+
+                // --- SORTING LOGIC FOR SIDEBAR (Active top, Resolved bottom) ---
                 data.sort((a, b) => {
                     const isResolvedA = a.status === 'Resolved';
                     const isResolvedB = b.status === 'Resolved';
-                    
-                    // Grouping: Push 'Resolved' items below 'Active' items
                     if (isResolvedA && !isResolvedB) return 1;
                     if (!isResolvedA && isResolvedB) return -1;
-                    
-                    // Sorting internally by time: Newest first
-                    const timeA = new Date(a.timestamp).getTime();
-                    const timeB = new Date(b.timestamp).getTime();
-                    return timeB - timeA; 
+                    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(); 
                 });
 
-                // Iterate over the newly sorted data
+                // --- 1. MAIN LOOP: Create Map Markers & Sidebar Items ---
                 data.forEach(report => {
                     if (report.latitude && report.longitude) {
                         let dateStr = report.timestamp ? new Date(report.timestamp).toLocaleString() : "Unknown Date";
                         let itemColor = getUiColor(report.category, report.status);
 
-                        // 1. Map Marker & Popup
+                        // Map Marker & Popup
                         var marker = L.marker([report.latitude, report.longitude], { icon: getIcon(report.category, report.status) });
                         var popupHTML = `
                             <div class="popup-inner" style="background-color: ${itemColor};">
                                 <h3>${report.category}</h3>
                                 Severity: <b>${report.severity}</b><br>
                                 Status: <b>${report.status || 'New'}</b><br>
+                                ${report.phone_number ? `Contact: <b>📞 ${report.phone_number}</b><br>` : ''}
                                 <span class="coord-text">Coordinates: <b>${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</b></span>
                                 ${report.image_file ? `<img src="${report.image_file}" class="popup-img"><br>` : ''}
                                 <hr>
@@ -292,15 +291,17 @@
                                 <button onclick="updateReportStatus(${report.id})" style="width:100%; background:rgba(0,0,0,0.2); color:white; border:1px solid rgba(255,255,255,0.4); padding:8px; border-radius:4px; cursor:pointer; font-weight:bold;">Save Changes</button>
                             </div>`;
                         marker.bindPopup(popupHTML);
-                        // NEW: Add the marker to the cluster group instead of the raw map
                         markersClusterGroup.addLayer(marker);
+                        
+                        // Save the marker to our dictionary using the report ID
+                        mapMarkers[report.id] = marker;
 
-                        // 2. Sidebar Item
+                        // Sidebar Item
                         var item = document.createElement('div');
                         item.className = 'report-item';
                         item.style.backgroundColor = itemColor;
                         item.innerHTML = `<div class="report-cat">${report.category}</div><div class="report-meta">Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br><div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em;">🕒 ${dateStr}</div></div>`;
-                        // UPDATED: Use MarkerCluster's special zoom function so it un-clusters before opening the popup
+                        
                         item.addEventListener('click', () => { 
                             switchView('map'); 
                             markersClusterGroup.zoomToShowLayer(marker, function () {
@@ -308,40 +309,53 @@
                             });
                         });
                         listContainer.appendChild(item);
-
-                        // 3. Feedback Cards
-                        if (report.rating) {
-                            let stars = '★'.repeat(report.rating) + '☆'.repeat(5 - report.rating);
-                            let feedbackItem = document.createElement('div');
-                            feedbackItem.className = 'feedback-card';
-                            
-                            // --- NEW: Format the feedback timestamp safely and cleanly ---
-                            let fbDateStr = report.feedback_timestamp 
-                                ? new Date(report.feedback_timestamp).toLocaleString('default', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) 
-                                : "Just now";
-
-                            // --- UPDATED: Swapped Report ID for the new fbDateStr ---
-                            feedbackItem.innerHTML = `
-                                <strong>${report.category} Issue Repaired</strong> <span style="color:#95a5a6; font-size:0.8em;">(Posted: ${fbDateStr})</span>
-                                <div class="feedback-stars">${stars}</div>
-                                ${report.feedback ? `<div class="feedback-comment">"${report.feedback}"</div>` : ''}
-                            `;
-                            
-                            // UPDATED: Click Listener to jump to the map and unpack the cluster
-                            feedbackItem.addEventListener('click', () => { 
-                                switchView('map'); 
-                                markersClusterGroup.zoomToShowLayer(marker, function () {
-                                    marker.openPopup();
-                                });
-                            });
-                            
-                            feedbackContainer.appendChild(feedbackItem);
-                        }
                     }
                 });
+
+                // --- 2. ISOLATED LOOP: Sort and Render Feedback (Newest First) ---
+                const feedbackReports = data.filter(r => r.rating !== null && r.rating !== undefined);
                 
-                if(feedbackContainer.innerHTML === '') {
+                // Sort the filtered list purely by feedback timestamp
+                feedbackReports.sort((a, b) => {
+                    let timeA = a.feedback_timestamp ? new Date(a.feedback_timestamp).getTime() : 0;
+                    let timeB = b.feedback_timestamp ? new Date(b.feedback_timestamp).getTime() : 0;
+                    return timeB - timeA; 
+                });
+
+                if (feedbackReports.length === 0) {
                     feedbackContainer.innerHTML = '<p style="text-align:center; color:#7f8c8d;">No citizen ratings or feedback submitted yet.</p>';
+                } else {
+                    feedbackReports.forEach(report => {
+                        let stars = '★'.repeat(report.rating) + '☆'.repeat(5 - report.rating);
+                        let feedbackItem = document.createElement('div');
+                        feedbackItem.className = 'feedback-card';
+                        
+                        let fbDateStr = report.feedback_timestamp 
+                            ? new Date(report.feedback_timestamp).toLocaleString('default', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) 
+                            : "Just now";
+
+                        feedbackItem.innerHTML = `
+                            <strong>${report.category} Issue Repaired</strong> <span style="color:#95a5a6; font-size:0.8em;">(Posted: ${fbDateStr})</span>
+                            <div class="feedback-stars">${stars}</div>
+                            ${report.feedback ? `<div class="feedback-comment">"${report.feedback}"</div>` : ''}
+                        `;
+                        
+                        // Click Listener cross-referencing our mapMarkers dictionary
+                        feedbackItem.addEventListener('click', () => { 
+                            switchView('map'); 
+                            let targetMarker = mapMarkers[report.id];
+                            if (targetMarker) {
+                                markersClusterGroup.zoomToShowLayer(targetMarker, function () {
+                                    targetMarker.openPopup();
+                                });
+                            } else {
+                                // Fallback just in case the marker wasn't generated
+                                map.flyTo([report.latitude, report.longitude], 17);
+                            }
+                        });
+                        
+                        feedbackContainer.appendChild(feedbackItem);
+                    });
                 }
             })
             .catch(err => console.error("Error:", err));
