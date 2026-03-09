@@ -89,8 +89,8 @@
                 </div>
                 <canvas id="performanceChart" height="120"></canvas>
             </div>
-            <div class="chart-container"><div class="chart-header"><h2>Active Reports by Category</h2></div><div style="max-width: 400px; margin: 0 auto;"><canvas id="categoryChart"></canvas></div></div>
-            <div class="chart-container"><div class="chart-header"><h2>Resolved Reports by Category</h2></div><div style="max-width: 400px; margin: 0 auto;"><canvas id="resolvedCategoryChart"></canvas></div></div>
+            <div class="chart-container"><div class="chart-header"><h2>Active Reports by Category</h2></div><div><canvas id="categoryChart"></canvas></div></div>
+            <div class="chart-container"><div class="chart-header"><h2>Resolved Reports by Category</h2></div><div><canvas id="resolvedCategoryChart"></canvas></div></div>
         </div>
 
         <div id="feedback-view">
@@ -220,24 +220,58 @@
 
         function updateCategoryCharts() {
             const activeCategoryCounts = {}, resolvedCategoryCounts = {}, activeChartBgColors = [], resolvedChartBgColors = [];
+            
             globalReports.forEach(report => {
                 const cat = report.category || 'Unknown';
-                if (report.status === 'Resolved') { resolvedCategoryCounts[cat] = (resolvedCategoryCounts[cat] || 0) + 1; } 
-                else { activeCategoryCounts[cat] = (activeCategoryCounts[cat] || 0) + 1; }
+                if (report.status === 'Resolved') { 
+                    resolvedCategoryCounts[cat] = (resolvedCategoryCounts[cat] || 0) + 1; 
+                } else { 
+                    activeCategoryCounts[cat] = (activeCategoryCounts[cat] || 0) + 1; 
+                }
             });
 
+            // --- 1. ACTIVE REPORTS BAR CHART ---
             const activeLabels = Object.keys(activeCategoryCounts);
             activeLabels.forEach(l => activeChartBgColors.push(getCategoryColorObj(l).hex));
+            
             if (categoryChart) categoryChart.destroy();
             categoryChart = new Chart(document.getElementById('categoryChart').getContext('2d'), {
-                type: 'doughnut', data: { labels: activeLabels, datasets: [{ data: Object.values(activeCategoryCounts), backgroundColor: activeChartBgColors, borderWidth: 1 }] }, options: { plugins: { legend: { position: 'right' } } }
+                type: 'bar', // Changed from 'doughnut' to 'bar'
+                data: { 
+                    labels: activeLabels, 
+                    datasets: [{ 
+                        label: 'Active Reports',
+                        data: Object.values(activeCategoryCounts), 
+                        backgroundColor: activeChartBgColors, 
+                        borderWidth: 1 
+                    }] 
+                }, 
+                options: { 
+                    plugins: { legend: { display: false } }, // Hide legend since X-axis has labels
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } // Force whole numbers
+                }
             });
 
+            // --- 2. RESOLVED REPORTS BAR CHART ---
             const resolvedLabels = Object.keys(resolvedCategoryCounts);
             resolvedLabels.forEach(l => resolvedChartBgColors.push(getCategoryColorObj(l).hex));
+            
             if (resolvedCategoryChart) resolvedCategoryChart.destroy();
             resolvedCategoryChart = new Chart(document.getElementById('resolvedCategoryChart').getContext('2d'), {
-                type: 'doughnut', data: { labels: resolvedLabels, datasets: [{ data: Object.values(resolvedCategoryCounts), backgroundColor: resolvedChartBgColors, borderWidth: 1 }] }, options: { plugins: { legend: { position: 'right' } } }
+                type: 'bar', // Changed from 'doughnut' to 'bar'
+                data: { 
+                    labels: resolvedLabels, 
+                    datasets: [{ 
+                        label: 'Resolved Reports',
+                        data: Object.values(resolvedCategoryCounts), 
+                        backgroundColor: resolvedChartBgColors, 
+                        borderWidth: 1 
+                    }] 
+                }, 
+                options: { 
+                    plugins: { legend: { display: false } }, // Hide legend
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } // Force whole numbers
+                }
             });
         }
 
@@ -326,9 +360,15 @@
                     feedbackContainer.innerHTML = '<p style="text-align:center; color:#7f8c8d;">No citizen ratings or feedback submitted yet.</p>';
                 } else {
                     feedbackReports.forEach(report => {
+                        // --- UPDATED: Grab pure category color, completely ignoring 'Resolved' status ---
+                        let pureCategoryColor = getCategoryColorObj(report.category).hex;
+                        
                         let stars = '★'.repeat(report.rating) + '☆'.repeat(5 - report.rating);
                         let feedbackItem = document.createElement('div');
                         feedbackItem.className = 'feedback-card';
+                        
+                        // --- UPDATED: Force the entire border property to ensure it overrides the CSS ---
+                        feedbackItem.style.borderLeft = `5px solid ${pureCategoryColor}`;
                         
                         let fbDateStr = report.feedback_timestamp 
                             ? new Date(report.feedback_timestamp).toLocaleString('default', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) 
@@ -349,7 +389,6 @@
                                     targetMarker.openPopup();
                                 });
                             } else {
-                                // Fallback just in case the marker wasn't generated
                                 map.flyTo([report.latitude, report.longitude], 17);
                             }
                         });
