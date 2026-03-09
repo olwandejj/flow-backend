@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 # --- INITIALIZE FIREBASE ADMIN ---
-# This looks for 'firebase-key.json' in your main project folder (next to manage.py)
+# This looks for 'firebase-key.json' in the main project folder (next to manage.py)
 if not firebase_admin._apps:
     try:
         cred_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'firebase-key.json')
@@ -51,7 +51,7 @@ def update_report_status(request, pk):
             # --- ACTUAL FIREBASE PUSH NOTIFICATION TRIGGER ---
             if new_status == 'Resolved' and report.fcm_token:
                 try:
-                    # CHANGED: We removed 'notification=' and put everything inside 'data='
+                    # CHANGED: Removed 'notification=' and put everything inside 'data='
                     # This ensures the Android app stays in 100% control of the click behavior
                     message = messaging.Message(
                         data={

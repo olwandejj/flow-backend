@@ -12,3 +12,5 @@ db.sqlite3
 
 # Ignore OS files
 .DS_Store
+
+firebase-key.json
