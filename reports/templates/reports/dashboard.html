@@ -79,6 +79,7 @@
     </div>
 
     <div id="content-area">
+        <button id="toggle-map-btn" onclick="toggleMapMode()" style="position: absolute; top: 15px; right: 15px; z-index: 1000; padding: 10px 15px; background: #34495e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">Show Heatmap</button>
         <div id="map-view"></div>
         
         <div id="analytics-view">
@@ -102,8 +103,13 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script>
         let map, globalReports = [], performanceChart = null, categoryChart = null, resolvedCategoryChart = null, markersClusterGroup;
+
+        // --- NEW: Heatmap Variables ---
+        let heatLayer = null;
+        let isHeatmapMode = false;
 
         const colorPalette = [{ hex: '#e74c3c', iconName: 'red' }, { hex: '#f39c12', iconName: 'orange' }, { hex: '#3498db', iconName: 'blue' }, { hex: '#9b59b6', iconName: 'violet' }, { hex: '#2ecc71', iconName: 'green' }, { hex: '#34495e', iconName: 'black' }];
         let categoryColors = {}, paletteIndex = 0;
@@ -146,13 +152,56 @@
             map.addLayer(markersClusterGroup);
         }
 
+        // --- NEW: Heatmap Logic ---
+        function toggleMapMode() {
+            isHeatmapMode = !isHeatmapMode;
+            const btn = document.getElementById('toggle-map-btn');
+
+            if (isHeatmapMode) {
+                // 1. Remove Clusters
+                map.removeLayer(markersClusterGroup);
+                
+                // 2. Build Heatmap Data
+                const heatData = [];
+                globalReports.forEach(report => {
+                    if (report.latitude && report.longitude) {
+                        // Use a slight intensity boost (0.8) for all points
+                        heatData.push([report.latitude, report.longitude, 0.8]); 
+                    }
+                });
+
+                // 3. Create and Add Heatmap Layer
+                if (heatLayer) map.removeLayer(heatLayer);
+                heatLayer = L.heatLayer(heatData, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 14,
+                    gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'} // Cool to Hot
+                }).addTo(map);
+
+                btn.innerText = "Show Map Pins";
+                btn.style.background = "#e74c3c"; // Change button color to Red
+            } else {
+                // Switch back to pins
+                if (heatLayer) map.removeLayer(heatLayer);
+                map.addLayer(markersClusterGroup);
+                btn.innerText = "Show Heatmap";
+                btn.style.background = "#34495e"; // Back to Dark Blue
+            }
+        }
+
         function switchView(viewName) {
             document.getElementById('map-view').style.display = 'none';
             document.getElementById('analytics-view').style.display = 'none';
             document.getElementById('feedback-view').style.display = 'none';
 
+            // --- NEW: Hide the toggle button by default ---
+            document.getElementById('toggle-map-btn').style.display = 'none';
+
             if (viewName === 'map') {
-                document.getElementById('map-view').style.display = 'block'; map.invalidateSize(); 
+                document.getElementById('map-view').style.display = 'block'; map.invalidateSize();
+                document.getElementById('toggle-map-btn').style.display = 'block'; // Show on map
+                map.invalidateSize(); 
             } else if (viewName === 'analytics') {
                 document.getElementById('analytics-view').style.display = 'block'; updateTimeChart(); updateCategoryCharts(); 
             } else if (viewName === 'feedback') {
