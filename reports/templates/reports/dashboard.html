@@ -371,7 +371,7 @@
                                 <h3 style="margin-bottom: 5px;">#${report.id} - ${report.category}</h3>
                                 Severity: <b>${report.severity}</b><br>
                                 Status: <b>${report.status || 'New'}</b><br>
-                                ${report.phone_number ? `Contact: <b>📞 ${report.phone_number}</b><br>` : ''}
+                                ${report.phone_number ? `Contact: <b>${report.phone_number}</b><br>` : ''}
                                 <span class="coord-text">Coordinates: <b>${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</b></span>
                                 ${report.image_file ? `<img src="${report.image_file}" class="popup-img"><br>` : ''}
                                 <hr>
@@ -393,14 +393,27 @@
                         var item = document.createElement('div');
                         item.className = 'report-item';
                         item.style.backgroundColor = itemColor;
-
-                        // --- NEW: Attach invisible dataset attributes for instant filtering ---
+                        
+                        // Attach invisible dataset attributes for instant filtering
                         item.dataset.id = report.id ? report.id.toString() : "";
                         item.dataset.category = (report.category || "").toLowerCase();
                         item.dataset.status = report.status || "New";
 
-                        // --- UPDATED: Added #${report.id} to the visible title so it's easy to read ---
-                        item.innerHTML = `<div class="report-cat">#${report.id} - ${report.category}</div><div class="report-meta">Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br><div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em;">🕒 ${dateStr}</div></div>`;
+                        // --- NEW: Format coordinates safely (matching the Android logic) ---
+                        let latStr = report.latitude ? report.latitude.toFixed(5) : "N/A";
+                        let lonStr = report.longitude ? report.longitude.toFixed(5) : "N/A";
+
+                        // --- UPDATED: Injected the 📍 Coordinates line right under the timestamp ---
+                        item.innerHTML = `
+                            <div class="report-cat">#${report.id} - ${report.category}</div>
+                            <div class="report-meta">
+                                Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br>
+                                <div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em; line-height: 1.4;">
+                                    🕒 ${dateStr}<br>
+                                    📍 ${latStr}, ${lonStr}
+                                </div>
+                            </div>
+                        `;
                         
                         item.addEventListener('click', () => { 
                             switchView('map'); 
