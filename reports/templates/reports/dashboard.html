@@ -368,7 +368,7 @@
                         var marker = L.marker([report.latitude, report.longitude], { icon: getIcon(report.category, report.status) });
                         var popupHTML = `
                             <div class="popup-inner" style="background-color: ${itemColor};">
-                                <h3>${report.category}</h3>
+                                <h3 style="margin-bottom: 5px;">#${report.id} - ${report.category}</h3>
                                 Severity: <b>${report.severity}</b><br>
                                 Status: <b>${report.status || 'New'}</b><br>
                                 ${report.phone_number ? `Contact: <b>📞 ${report.phone_number}</b><br>` : ''}
@@ -441,7 +441,7 @@
                             : "Just now";
 
                         feedbackItem.innerHTML = `
-                            <strong>${report.category} Issue Repaired</strong> <span style="color:#95a5a6; font-size:0.8em;">(Posted: ${fbDateStr})</span>
+                            <strong>#${report.id} - ${report.category} Issue Repaired</strong> <span style="color:#95a5a6; font-size:0.8em;">(Posted: ${fbDateStr})</span>
                             <div class="feedback-stars">${stars}</div>
                             ${report.feedback ? `<div class="feedback-comment">"${report.feedback}"</div>` : ''}
                         `;
