@@ -14,3 +14,6 @@ db.sqlite3
 .DS_Store
 
 firebase-key.json
+
+# Ignore uploaded user media
+media/
