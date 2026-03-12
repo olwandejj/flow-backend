@@ -75,6 +75,16 @@
             <h2>💧 Flow</h2>
             <div class="stats" id="stats-text">Loading reports...</div>
         </div>
+        
+        <div style="padding: 12px; background: #ecf0f1; border-bottom: 1px solid #bdc3c7;">
+            <input type="text" id="searchInput" placeholder="Search by ID or Category..." onkeyup="filterReports()" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #bdc3c7; border-radius: 4px; box-sizing: border-box; font-family: inherit;">
+            <select id="statusFilter" onchange="filterReports()" style="width: 100%; padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; box-sizing: border-box; font-family: inherit;">
+                <option value="All">All Statuses</option>
+                <option value="New">New</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+            </select>
+        </div>
         <div id="report-list"></div>
     </div>
 
@@ -383,7 +393,14 @@
                         var item = document.createElement('div');
                         item.className = 'report-item';
                         item.style.backgroundColor = itemColor;
-                        item.innerHTML = `<div class="report-cat">${report.category}</div><div class="report-meta">Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br><div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em;">🕒 ${dateStr}</div></div>`;
+
+                        // --- NEW: Attach invisible dataset attributes for instant filtering ---
+                        item.dataset.id = report.id ? report.id.toString() : "";
+                        item.dataset.category = (report.category || "").toLowerCase();
+                        item.dataset.status = report.status || "New";
+
+                        // --- UPDATED: Added #${report.id} to the visible title so it's easy to read ---
+                        item.innerHTML = `<div class="report-cat">#${report.id} - ${report.category}</div><div class="report-meta">Severity: <b>${report.severity}</b> &nbsp;|&nbsp; Status: <b>${report.status || 'New'}</b><br><div style="margin-top: 5px; color: #ecf0f1; font-size: 0.8em;">🕒 ${dateStr}</div></div>`;
                         
                         item.addEventListener('click', () => { 
                             switchView('map'); 
@@ -454,6 +471,33 @@
             fetch(`/api/reports/${reportId}/update-status/`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, body: JSON.stringify({ status: newStatus }) })
             .then(response => { if (response.ok) { alert('Status updated successfully!'); location.reload(); } else { alert('Failed to update status. Please try again.'); } })
             .catch(error => console.error('Error:', error));
+        }
+
+        // --- NEW: Sidebar Filter Logic ---
+        function filterReports() {
+            let searchText = document.getElementById('searchInput').value.toLowerCase();
+            let statusFilter = document.getElementById('statusFilter').value;
+            let items = document.getElementsByClassName('report-item');
+
+            for (let i = 0; i < items.length; i++) {
+                let item = items[i];
+                let id = item.dataset.id;
+                let category = item.dataset.category;
+                let status = item.dataset.status;
+
+                // Check if the search box matches the ID or Category
+                let matchesSearch = id.includes(searchText) || category.includes(searchText);
+                
+                // Check if the dropdown matches the Status
+                let matchesStatus = (statusFilter === 'All') || (status === statusFilter);
+
+                // If both match, show it. Otherwise, hide it!
+                if (matchesSearch && matchesStatus) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            }
         }
     </script>
 </body>
